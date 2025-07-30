@@ -14,6 +14,8 @@ export interface CreateOrderData {
   delivery_fee: number;
   total_amount: number;
   payment_method: 'cod' | 'online';
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
 }
 
 export interface CreateShippingAddressData {
@@ -74,6 +76,9 @@ class OrderService {
             delivery_fee: orderData.delivery_fee,
             total_amount: orderData.total_amount,
             payment_method: orderData.payment_method,
+            razorpay_order_id: orderData.razorpay_order_id,
+            razorpay_payment_id: orderData.razorpay_payment_id,
+            payment_status: orderData.payment_method === 'online' ? 'paid' : 'pending',
           }
         ])
         .select()

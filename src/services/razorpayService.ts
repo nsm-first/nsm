@@ -47,14 +47,14 @@ export const razorpayService = {
     });
   },
 
-  async createOrder(amount: number): Promise<{ id: string; amount: number }> {
-    // In a real application, this would call your backend API
-    // For demo purposes, we'll simulate the order creation
-    const orderId = 'order_' + Math.random().toString(36).substr(2, 9);
+  createOrder(amount: number): { id: string; amount: number; currency: string } {
+    // Generate a unique order ID for demo purposes
+    const orderId = 'order_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
     
     return {
       id: orderId,
-      amount: amount * 100 // Razorpay expects amount in paise
+      amount: amount * 100, // Razorpay expects amount in paise
+      currency: 'INR'
     };
   },
 

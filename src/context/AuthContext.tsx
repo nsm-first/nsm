@@ -126,8 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             name,
+            full_name: name,
           },
-          emailRedirectTo: `${window.location.origin}/email-confirmation`,
         },
       });
       
@@ -138,8 +138,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       console.log('Sign up successful:', data.user?.id);
       
-      // Try to insert user info into 'users' table if sign up is successful
-      // This is a fallback in case the database trigger is not set up
+      // Insert user info into 'users' table
       if (data.user) {
         try {
           const { error: dbError } = await supabase.from('users').insert([
@@ -147,21 +146,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               id: data.user.id,
               name,
               email,
+              phone: '', // Will be updated later if provided
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
             },
           ]);
           
           if (dbError) {
-            console.error('Database insert error:', dbError);
-            // Don't throw error here as the user account was created successfully
-            // The database insert can be retried later or handled by the trigger
+            // If user already exists, that's fine
+            if (dbError.code !== '23505') { // 23505 is unique violation
+              console.error('Database insert error:', dbError);
+            }
           } else {
             console.log('User profile created in database');
           }
         } catch (dbError) {
           console.error('Database insert failed:', dbError);
-          // Continue without throwing error
         }
         
         // Set user profile after successful sign up
@@ -169,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: data.user.id, 
           name, 
           email, 
+          phone: '',
           created_at: new Date().toISOString(), 
           updated_at: new Date().toISOString() 
         });

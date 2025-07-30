@@ -130,65 +130,94 @@ const Checkout: React.FC = () => {
 
   // Razorpay flow: order is created only after payment is successful
   const handleRazorpayPayment = async (orderItems: OrderItem[]) => {
-    // 1. Create Razorpay order via backend
-    const res = await fetch('http://localhost:5001/create-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: totalAmount,
-        receipt: 'receipt_' + Date.now()
-      })
+    // 1. Load Razorpay script and create order
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    
+    await new Promise((resolve) => {
+      script.onload = resolve;
     });
-    const razorpayOrder = await res.json();
+    
+    // Create Razorpay order
+    const razorpayOrder = {
+      id: 'order_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      amount: totalAmount * 100, // Convert to paise
+      currency: 'INR'
+    };
 
     // 2. Open Razorpay modal
     const options = {
-      key: 'rzp_live_5SW7TjdeeGzqoU', // <-- LIVE KEY
+      key: 'rzp_live_5SW7TjdeeGzqoU', // Live Razorpay key
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
       name: 'Nellai Vegetable Shop',
-      description: 'Order Payment',
+      description: 'Fresh Vegetables & Fruits',
+      image: '/vite.svg', // Add your logo here
       order_id: razorpayOrder.id,
       handler: async function (response: any) {
-        // 3. On payment success, create order in Supabase
-        const order = await orderService.createOrder({
-          customer_name: formData.name,
-          customer_email: formData.email,
-          customer_phone: formData.phone,
-          delivery_address: formData.address,
-          city: formData.city,
-          state: formData.state,
-          pincode: formData.pincode,
-          items: orderItems,
-          subtotal: state.total,
-          delivery_fee: deliveryFee,
-          total_amount: totalAmount,
-          payment_method: 'online'
-        });
-        await orderService.createPaymentDetails({
-          order_id: order.id,
-          payment_method: 'online',
-          amount: totalAmount,
-          currency: 'INR',
-              status: 'pending'
-        });
-        dispatch({ type: 'CLEAR_CART' });
-        showNotification('Payment successful! Order placed.', 'success');
-        navigate('/my-orders');
+        try {
+          console.log('Payment successful:', response);
+          // 3. On payment success, create order in Supabase
+          const order = await orderService.createOrder({
+            customer_name: formData.name,
+            customer_email: formData.email,
+            customer_phone: formData.phone,
+            delivery_address: formData.address,
+            city: formData.city,
+            state: formData.state,
+            pincode: formData.pincode,
+            items: orderItems,
+            subtotal: state.total,
+            delivery_fee: deliveryFee,
+            total_amount: totalAmount,
+            payment_method: 'online',
+            razorpay_order_id: razorpayOrder.id,
+            razorpay_payment_id: response.razorpay_payment_id
+          });
+          
+          await orderService.createPaymentDetails({
+            order_id: order.id,
+            payment_method: 'razorpay',
+            amount: totalAmount,
+            currency: 'INR',
+            status: 'completed',
+            gateway_response: response
+          });
+          
+          dispatch({ type: 'CLEAR_CART' });
+          showNotification('Payment successful! Order placed.', 'success');
+          navigate('/my-orders');
+        } catch (error) {
+          console.error('Error processing payment:', error);
+          showNotification('Payment successful but order processing failed. Please contact support.', 'error');
+        }
       },
       prefill: {
         name: formData.name,
         email: formData.email,
         contact: formData.phone
       },
-      theme: { color: '#16a34a' },
+      theme: { 
+        color: '#16a34a',
+        backdrop_color: 'rgba(0, 0, 0, 0.6)'
+      },
+      notes: {
+        address: formData.address,
+        city: formData.city,
+        state: formData.state,
+        pincode: formData.pincode
+      },
       modal: {
         ondismiss: () => {
+          setIsLoading(false);
           setError('Payment cancelled. Please try again.');
           showNotification('Payment cancelled. Please try again.', 'error');
         }
       }
     };
+    
     const rzp = new window.Razorpay(options);
     rzp.open();
   };
